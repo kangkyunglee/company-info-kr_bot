@@ -1,19 +1,7 @@
-try { require("dotenv").config(); } catch {}
+require("dotenv").config();
 const { Telegraf } = require("telegraf");
 const Anthropic = require("@anthropic-ai/sdk").default;
 const https = require("https");
-
-// Debug: log ALL env var keys to check Railway injection
-console.log("Total env vars:", Object.keys(process.env).length);
-console.log("All env keys:", Object.keys(process.env).join(", "));
-console.log("TELEGRAM_BOT_TOKEN value length:", (process.env.TELEGRAM_BOT_TOKEN || "").length);
-
-if (!process.env.TELEGRAM_BOT_TOKEN) {
-  console.error("ERROR: TELEGRAM_BOT_TOKEN is not set! Waiting 10s and retrying...");
-  setTimeout(() => {
-    console.log("Retry - TELEGRAM_BOT_TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
-  }, 10000);
-}
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
