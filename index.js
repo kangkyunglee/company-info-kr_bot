@@ -179,6 +179,11 @@ async function lookupCompany(companyName) {
   );
   let result = textBlocks.map((block) => block.text).join("\n");
 
+  // 같은 섹션 내 연속 빈 줄 제거 (이모지 섹션 사이만 빈 줄 1개 유지)
+  result = result
+    .replace(/\n{3,}/g, "\n\n")  // 3개 이상 줄바꿈 → 2개로
+    .replace(/\n\n(?![\u{1F3E2}\u{1F4CB}\u{1F4E6}\u{1F91D}\u{1F4B0}\u{1F4F0}\u{1F517}])/gu, "\n");  // 이모지 섹션 앞만 빈 줄 유지
+
   // Append DART data if available
   if (dartData) {
     result += "\n---\n" + dartData;
