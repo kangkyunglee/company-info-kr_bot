@@ -359,13 +359,13 @@ bot.help((ctx) => {
 });
 
 // /기업조사 command
-bot.command("기업조사", (ctx) => {
+bot.hears(/^\/기업조사/, (ctx) => {
   userMode[ctx.from.id] = "company";
   ctx.reply("어떤 기업을 확인하시겠습니까?");
 });
 
 // /기사검색 command
-bot.command("기사검색", (ctx) => {
+bot.hears(/^\/기사검색/, (ctx) => {
   userMode[ctx.from.id] = "news";
   ctx.reply("어떤 기업의 기사를 검색하시겠습니까?");
 });
