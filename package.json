@@ -1,0 +1,14 @@
+{
+  "name": "company-info-bot",
+  "version": "1.0.0",
+  "description": "텔레그램 기업정보 조회 봇",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "telegraf": "^4.16.3",
+    "dotenv": "^16.4.7"
+  }
+}
