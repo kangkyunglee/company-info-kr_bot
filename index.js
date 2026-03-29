@@ -208,19 +208,17 @@ async function lookupCompany(companyName) {
   const sectionKeywords = ["사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
   const lines = result.split("\n").filter((line) => line.trim() !== "");
   const cleaned = [];
-  let inSection = false;
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const isSection = sectionKeywords.some((kw) => line.includes(kw));
+    const isFirstLine = line.startsWith("🏢");
     if (isSection && cleaned.length > 0) {
       cleaned.push("");  // 섹션 앞에만 빈 줄 1개
-      inSection = true;
       cleaned.push(line);
-    } else if (line.startsWith("🏢")) {
+    } else if (isFirstLine) {
       cleaned.push(line);
-      inSection = false;
-    } else if (inSection && !line.startsWith("      ")) {
-      // 들여쓰기 없는 내용줄에 강제 들여쓰기 추가
-      cleaned.push("      " + line);
+    } else if (!isSection && !isFirstLine && !line.startsWith("      ")) {
+      cleaned.push("      " + line.trimStart());
     } else {
       cleaned.push(line);
     }
