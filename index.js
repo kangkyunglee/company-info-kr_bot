@@ -104,7 +104,7 @@ async function lookupCompany(companyName) {
   try {
     // 먼저 웹 검색 포함으로 시도
     claudeResponse = await anthropic.messages.create({
-      model: "claude-sonnet-4-6-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       tools: [
@@ -130,7 +130,7 @@ async function lookupCompany(companyName) {
     console.error("Web search API error:", err.message);
     // 웹 검색 실패 시 일반 모드로 재시도
     claudeResponse = await anthropic.messages.create({
-      model: "claude-sonnet-4-6-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [
