@@ -184,12 +184,18 @@ async function lookupCompany(companyName) {
   );
   let result = textBlocks.map((block) => block.text).join("\n");
 
-  // 빈 줄 정리: 모든 빈 줄 제거 후, 섹션 제목 앞에만 빈 줄 추가
-  const sectionTitles = ["사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
-  result = result.replace(/\n{2,}/g, "\n");  // 모든 연속 줄바꿈 → 1개로
-  for (const title of sectionTitles) {
-    result = result.replace(new RegExp(`\n(.+${title})`, "g"), "\n\n$1");
+  // 빈 줄 정리: 줄 단위로 처리
+  const sectionKeywords = ["사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
+  const lines = result.split("\n").filter((line) => line.trim() !== "");
+  const cleaned = [];
+  for (const line of lines) {
+    const isSection = sectionKeywords.some((kw) => line.includes(kw));
+    if (isSection && cleaned.length > 0) {
+      cleaned.push("");  // 섹션 앞에만 빈 줄 1개
+    }
+    cleaned.push(line);
   }
+  result = cleaned.join("\n");
 
   // Append DART data if available
   if (dartData) {
