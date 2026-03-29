@@ -336,16 +336,15 @@ async function searchNews(companyName) {
   return result;
 }
 
-// 사용자 모드 저장 (기업조사 / 기사검색)
+// 사용자 모드 저장
 const userMode = {};
 
 // /start command
 bot.start((ctx) => {
   ctx.reply(
     "🏢 *기업정보 봇*\n\n" +
-      "명령어:\n" +
       "/기업조사 - 기업 정보 조회\n" +
-      "/기사검색 - 기업 관련 최신 기사",
+      "/기사검색 - 최신 기사 검색",
     { parse_mode: "Markdown", disable_web_page_preview: true }
   );
 });
@@ -354,7 +353,7 @@ bot.start((ctx) => {
 bot.help((ctx) => {
   ctx.reply(
     "/기업조사 - 기업 정보 조회\n" +
-      "/기사검색 - 기업 관련 최신 기사",
+      "/기사검색 - 최신 기사 검색",
     { parse_mode: "Markdown", disable_web_page_preview: true }
   );
 });
@@ -402,7 +401,6 @@ bot.on("text", async (ctx) => {
       result = await searchNews(companyName);
     }
 
-    // Try Markdown first, fall back to plain text
     try {
       await ctx.reply(result, { parse_mode: "Markdown", disable_web_page_preview: true });
     } catch {
