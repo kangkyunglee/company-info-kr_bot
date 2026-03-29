@@ -90,7 +90,7 @@ const SYSTEM_PROMPT = `기업정보를 출력해. 반드시 아래 형식을 그
 형식 규칙:
 1. 각 섹션은 "이모지 제목" 줄과 "내용" 줄로 구성
 2. 제목 줄: ● + 제목 텍스트 (예: "● 사업내용"). 🏢 외에는 반드시 ●만 사용
-3. 내용 줄: 다음 줄에 6칸 공백 들여쓰기 후 내용 작성
+3. 내용 줄: 다음 줄에 3칸 공백 들여쓰기 후 내용 작성
 4. 섹션 사이에 빈 줄 1개
 
 출력 형식 (이 형식을 정확히 복사해서 내용만 바꿔):
@@ -221,8 +221,8 @@ async function lookupCompany(companyName) {
       cleaned.push(line);
     } else if (isFirstLine) {
       cleaned.push(line);
-    } else if (!isSection && !isFirstLine && !line.startsWith("      ")) {
-      cleaned.push("      " + line.trimStart());
+    } else if (!isSection && !isFirstLine && !line.startsWith("   ")) {
+      cleaned.push("   " + line.trimStart());
     } else {
       cleaned.push(line);
     }
@@ -393,8 +393,8 @@ bot.on("callback_query", async (ctx) => {
     for (const line of lines) {
       if (line.startsWith("📊") || line.startsWith("💹") || line.startsWith("⚔️")) {
         cleaned.push(line);
-      } else if (!line.startsWith("      ")) {
-        cleaned.push("      " + line.trimStart());
+      } else if (!line.startsWith("   ")) {
+        cleaned.push("   " + line.trimStart());
       } else {
         cleaned.push(line);
       }
