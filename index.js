@@ -89,7 +89,7 @@ const SYSTEM_PROMPT = `기업정보를 출력해. 반드시 아래 형식을 그
 
 형식 규칙:
 1. 각 섹션은 "이모지 제목" 줄과 "내용" 줄로 구성
-2. 제목 줄: 이모지 + 제목 텍스트 (예: "📋 사업내용")
+2. 제목 줄: ⚫ + 제목 텍스트 (예: "⚫ 사업내용"). 🏢 외에는 반드시 ⚫만 사용
 3. 내용 줄: 다음 줄에 6칸 공백 들여쓰기 후 내용 작성
 4. 섹션 사이에 빈 줄 1개
 
@@ -229,6 +229,9 @@ async function lookupCompany(companyName) {
     }
   }
   result = cleaned.join("\n");
+
+  // 🏢 외 모든 이모지를 ⚫로 강제 교체
+  result = result.replace(/^(?!🏢)(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/gmu, "⚫ ");
 
   // Append DART data if available
   if (dartData) {
