@@ -285,10 +285,22 @@ bot.on("text", async (ctx) => {
     const result = await lookupCompany(companyName);
 
     // Try Markdown first, fall back to plain text
+    const buttons = {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "📊 지분구조", callback_data: `share:${companyName}` },
+            { text: "💹 재무상세", callback_data: `finance:${companyName}` },
+            { text: "⚔️ 경쟁사", callback_data: `competitor:${companyName}` },
+          ],
+        ],
+      },
+      link_preview: { is_disabled: true },
+    };
     try {
-      await ctx.reply(result, { parse_mode: "Markdown", link_preview: { is_disabled: true } });
+      await ctx.reply(result, { parse_mode: "Markdown", ...buttons });
     } catch {
-      await ctx.reply(result);
+      await ctx.reply(result, buttons);
     }
   } catch (error) {
     console.error("Error:", error.message, error.status, JSON.stringify(error.error || {}));
@@ -302,6 +314,96 @@ bot.on("text", async (ctx) => {
     await ctx.deleteMessage(statusMsg.message_id);
   } catch {
     // ignore if can't delete
+  }
+});
+
+// 버튼 클릭 핸들러
+const DETAIL_PROMPTS = {
+  share: (name) => `"${name}" 기업의 지분구조를 조회해줘. 최대주주, 지분율, 주요주주 현황을 아래 형식으로:
+
+📊 지분구조 - ${name}
+      최대주주: [이름] ([지분율]%)
+      주요주주: [이름] ([지분율]%), [이름] ([지분율]%)
+      소액주주: [비율]%
+
+문체: 개조식, 간결하게, 서론 금지. 📊로 시작, 사족 금지`,
+
+  finance: (name) => `"${name}" 기업의 최근 3개년 재무실적을 조회해줘. 아래 형식으로:
+
+💹 재무상세 - ${name}
+      [연도] 매출 [금액] / 영업이익 [금액] / 순이익 [금액]
+      [연도] 매출 [금액] / 영업이익 [금액] / 순이익 [금액]
+      [연도] 매출 [금액] / 영업이익 [금액] / 순이익 [금액]
+
+문체: 개조식, 간결하게, 서론 금지. 💹로 시작, 사족 금지`,
+
+  competitor: (name) => `"${name}" 기업의 주요 경쟁사를 조회해줘. 아래 형식으로:
+
+⚔️ 경쟁사 - ${name}
+      [경쟁사1] - [한줄 설명]
+      [경쟁사2] - [한줄 설명]
+      [경쟁사3] - [한줄 설명]
+
+문체: 개조식, 간결하게, 서론 금지. ⚔️로 시작, 사족 금지`,
+};
+
+bot.on("callback_query", async (ctx) => {
+  const data = ctx.callbackQuery.data;
+  const [type, ...nameParts] = data.split(":");
+  const companyName = nameParts.join(":");
+
+  await ctx.answerCbQuery("조회 중...");
+
+  try {
+    const prompt = DETAIL_PROMPTS[type](companyName);
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 3,
+            user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" },
+          },
+        ],
+        messages: [{ role: "user", content: prompt }],
+      });
+    } catch {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        messages: [{ role: "user", content: prompt }],
+      });
+    }
+
+    const textBlocks = response.content.filter((b) => b.type === "text");
+    let result = textBlocks.map((b) => b.text).join("\n");
+
+    // 빈 줄 제거 및 들여쓰기 정리
+    const lines = result.split("\n").filter((l) => l.trim() !== "");
+    const cleaned = [];
+    for (const line of lines) {
+      if (line.startsWith("📊") || line.startsWith("💹") || line.startsWith("⚔️")) {
+        cleaned.push(line);
+      } else if (!line.startsWith("      ")) {
+        cleaned.push("      " + line.trimStart());
+      } else {
+        cleaned.push(line);
+      }
+    }
+    result = cleaned.join("\n");
+
+    try {
+      await ctx.reply(result, { parse_mode: "Markdown", link_preview: { is_disabled: true } });
+    } catch {
+      await ctx.reply(result);
+    }
+  } catch (error) {
+    console.error("Detail error:", error.message);
+    await ctx.reply("⚠️ 상세 조회 중 오류가 발생했습니다.");
   }
 });
 
