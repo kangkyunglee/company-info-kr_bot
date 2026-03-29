@@ -221,10 +221,9 @@ async function lookupCompany(companyName) {
       cleaned.push(line);
     } else if (isFirstLine) {
       cleaned.push(line);
-    } else if (!isSection && !isFirstLine && !line.startsWith("   ")) {
+    } else if (!isSection && !isFirstLine) {
+      // 모든 내용줄을 3칸 들여쓰기로 통일
       cleaned.push("   " + line.trimStart());
-    } else {
-      cleaned.push(line);
     }
   }
   result = cleaned.join("\n");
