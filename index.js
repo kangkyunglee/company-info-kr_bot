@@ -38,28 +38,31 @@ async function getDartFinancials(companyName) {
     }
 
     const corpCode = searchResult.corp_code;
-
-    // 2. 최근 사업연도 재무정보 조회 (단일회사)
     const year = new Date().getFullYear() - 1;
-    const finUrl = `https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=CFS`;
-    const finResult = await dartRequest(finUrl);
 
-    if (finResult.status !== "000" || !finResult.list) {
-      // CFS(연결) 실패 시 OFS(개별)로 재시도
-      const finUrl2 = `https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=OFS`;
-      const finResult2 = await dartRequest(finUrl2);
-      if (finResult2.status !== "000" || !finResult2.list) return null;
-      return formatDartData(finResult2.list, year);
-    }
+    // 2. 연결(CFS) + 개별(OFS) 동시 조회
+    const [cfsResult, ofsResult] = await Promise.all([
+      dartRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=CFS`),
+      dartRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=OFS`),
+    ]);
 
-    return formatDartData(finResult.list, year);
+    const hasCfs = cfsResult.status === "000" && cfsResult.list;
+    const hasOfs = ofsResult.status === "000" && ofsResult.list;
+
+    if (!hasCfs && !hasOfs) return null;
+
+    let result = `\n📊 DART 공시 데이터 (${year}년 사업보고서)\n`;
+    if (hasCfs) result += formatDartSection(cfsResult.list, "연결");
+    if (hasOfs) result += formatDartSection(ofsResult.list, "개별");
+
+    return result;
   } catch (error) {
     console.error("DART API error:", error.message);
     return null;
   }
 }
 
-function formatDartData(list, year) {
+function formatDartSection(list, label) {
   const revenue = list.find(
     (item) =>
       item.account_nm === "매출액" || item.account_nm === "수익(매출액)"
@@ -73,7 +76,7 @@ function formatDartData(list, year) {
       item.account_nm === "당기순이익(손실)"
   );
 
-  let result = `\n📊 DART 공시 데이터 (${year}년 사업보고서)\n`;
+  let result = `[${label}]\n`;
   if (revenue) result += `• 매출액: ${revenue.thstrm_amount}원\n`;
   if (operatingProfit)
     result += `• 영업이익: ${operatingProfit.thstrm_amount}원\n`;
@@ -100,8 +103,13 @@ const SYSTEM_PROMPT = `당신은 기업정보 조회 전문가입니다. 사용�
 • 고객사1, 고객사2, 고객사3
 
 💰 실적 (YYYY년)
+[연결]
 • 매출액: X,XXX억원 (전년비 +X.X%)
 • 영업이익: XXX억원 (전년비 +X.X%)
+[개별]
+• 매출액: X,XXX억원
+• 영업이익: XXX억원
+(연결 또는 개별 재무제표가 없는 경우 있는 것만 표시)
 
 📰 최근 주요이슈
 • (M&A, 투자유치, 신사업, 실적 관련 뉴스 등 최근 1~3개)
