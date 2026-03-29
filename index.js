@@ -276,16 +276,76 @@ async function lookupCompany(companyName) {
   return result;
 }
 
+// 기사검색 함수
+async function searchNews(companyName) {
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      system: `"${companyName}" 관련 최신 주요 기사/뉴스를 검색해서 아래 형식으로 출력. 서론·사족 금지.
+
+📰 ${companyName} 최신 기사
+
+1. [기사 제목]
+   출처 / 날짜
+   한 줄 요약
+
+2. [기사 제목]
+   출처 / 날짜
+   한 줄 요약
+
+3. [기사 제목]
+   출처 / 날짜
+   한 줄 요약
+
+규칙:
+- 최신순으로 3~5개
+- 개조식. 간결하게
+- 📰로 시작. 앞뒤 사족 금지
+- 요약은 1줄로 핵심만`,
+      tools: [
+        {
+          type: "web_search_20250305",
+          name: "web_search",
+          max_uses: 5,
+          user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" },
+        },
+      ],
+      messages: [{ role: "user", content: `"${companyName}" 최신 뉴스 기사 검색` }],
+    });
+  } catch (err) {
+    console.error("News search error:", err.message);
+    response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: `"${companyName}" 관련 최근 주요 뉴스를 알려줘. 개조식, 간결하게.` }],
+    });
+  }
+
+  const textBlocks = response.content.filter((b) => b.type === "text");
+  let result = textBlocks.map((b) => b.text).join("\n");
+
+  // 📰 앞 텍스트 제거
+  const startIdx = result.indexOf("📰");
+  if (startIdx > 0) result = result.substring(startIdx);
+
+  // 빈 줄 정리
+  result = result.split("\n").filter((l) => l.trim() !== "").join("\n");
+
+  return result;
+}
+
+// 사용자 모드 저장 (기업조사 / 기사검색)
+const userMode = {};
+
 // /start command
 bot.start((ctx) => {
   ctx.reply(
-    "🏢 *기업정보 조회 봇*\n\n" +
-      "기업명을 입력하면 다음 정보를 조회합니다:\n" +
-      "• 사업내용\n" +
-      "• 주요제품/서비스\n" +
-      "• 주요고객사\n" +
-      "• 최근 매출액/영업이익 (DART 공시 포함)\n\n" +
-      "예시: `삼성전자`, `티엠씨`, `네이버`",
+    "🏢 *기업정보 봇*\n\n" +
+      "명령어:\n" +
+      "/기업조사 - 기업 정보 조회\n" +
+      "/기사검색 - 기업 관련 최신 기사",
     { parse_mode: "Markdown", disable_web_page_preview: true }
   );
 });
@@ -293,13 +353,22 @@ bot.start((ctx) => {
 // /help command
 bot.help((ctx) => {
   ctx.reply(
-    "기업명을 입력하시면 해당 기업의 정보를 조회합니다.\n\n" +
-      "예시:\n" +
-      "• `삼성전자`\n" +
-      "• `현대자동차`\n" +
-      "• `카카오`",
+    "/기업조사 - 기업 정보 조회\n" +
+      "/기사검색 - 기업 관련 최신 기사",
     { parse_mode: "Markdown", disable_web_page_preview: true }
   );
+});
+
+// /기업조사 command
+bot.command("기업조사", (ctx) => {
+  userMode[ctx.from.id] = "company";
+  ctx.reply("궁금하신 기업명을 입력해주세요.");
+});
+
+// /기사검색 command
+bot.command("기사검색", (ctx) => {
+  userMode[ctx.from.id] = "news";
+  ctx.reply("기사를 검색할 기업명을 입력해주세요.");
 });
 
 // Handle text messages
@@ -309,6 +378,12 @@ bot.on("text", async (ctx) => {
   // Ignore commands
   if (companyName.startsWith("/")) return;
 
+  // 모드 미선택 시 안내
+  const mode = userMode[ctx.from.id];
+  if (!mode) {
+    return ctx.reply("/기업조사 또는 /기사검색 을 먼저 선택해주세요.");
+  }
+
   // Ignore very short or very long inputs
   if (companyName.length < 2) {
     return ctx.reply("2글자 이상의 기업명을 입력해주세요.");
@@ -317,10 +392,15 @@ bot.on("text", async (ctx) => {
     return ctx.reply("기업명이 너무 깁니다. 간단한 기업명을 입력해주세요.");
   }
 
-  const statusMsg = await ctx.reply(`🔍 "${companyName}" 조회 중...`);
+  const statusMsg = await ctx.reply(`🔍 "${companyName}" ${mode === "company" ? "조회" : "기사 검색"} 중...`);
 
   try {
-    const result = await lookupCompany(companyName);
+    let result;
+    if (mode === "company") {
+      result = await lookupCompany(companyName);
+    } else {
+      result = await searchNews(companyName);
+    }
 
     // Try Markdown first, fall back to plain text
     try {
@@ -341,6 +421,9 @@ bot.on("text", async (ctx) => {
   } catch {
     // ignore if can't delete
   }
+
+  // 모드 초기화
+  delete userMode[ctx.from.id];
 });
 
 // Error handling
