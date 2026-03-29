@@ -429,8 +429,8 @@ bot.catch((err) => {
   console.error("Bot error:", err.message);
 });
 
-// Start bot
-bot.launch();
+// Start bot - 기존 webhook 제거 후 polling 시작
+bot.launch({ dropPendingUpdates: true });
 console.log("✅ 기업정보 조회 봇이 시작되었습니다! (Claude + DART 연동)");
 
 // Graceful shutdown
