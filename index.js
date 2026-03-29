@@ -97,6 +97,12 @@ const SYSTEM_PROMPT = `기업정보를 출력해. 반드시 아래 형식을 그
 
 🏢 [기업명] ([종목코드] · [시장명])
 
+👤 대표자
+      [대표이사 이름]
+
+📍 소재지
+      [본사 주소 - 시/도 단위로 간결하게]
+
 📋 사업내용
       [1~2줄 사업 설명]
 
@@ -204,7 +210,7 @@ async function lookupCompany(companyName) {
   }
 
   // 빈 줄 정리: 줄 단위로 처리
-  const sectionKeywords = ["사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
+  const sectionKeywords = ["대표자", "소재지", "사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
   const lines = result.split("\n").filter((line) => line.trim() !== "");
   const cleaned = [];
   for (let i = 0; i < lines.length; i++) {
