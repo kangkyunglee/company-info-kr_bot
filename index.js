@@ -190,70 +190,90 @@ async function lookupCompany(companyName) {
   );
   let result = textBlocks.map((block) => block.text).join("\n");
 
-  // 🏢 앞의 모든 텍스트 제거 (서론/인사말 제거)
-  const startIdx = result.indexOf("🏢");
-  if (startIdx > 0) {
-    result = result.substring(startIdx);
-  }
+  // === 통합 검증 에이전트 ===
+  result = validateAndFormat(result);
 
-  // 홈페이지 URL 뒤의 모든 텍스트 제거
-  const lines_raw = result.split("\n");
-  let cutIdx = -1;
-  let foundHomepage = false;
-  for (let i = 0; i < lines_raw.length; i++) {
-    if (lines_raw[i].includes("홈페이지")) {
-      foundHomepage = true;
-    }
-    if (foundHomepage && (lines_raw[i].match(/https?:\/\//) || lines_raw[i].match(/www\./) || lines_raw[i].match(/\.\w{2,3}$/))) {
-      cutIdx = i;
-      break;
-    }
-  }
-  if (cutIdx > 0) {
-    result = lines_raw.slice(0, cutIdx + 1).join("\n");
-  }
+  function validateAndFormat(text) {
+    const SECTIONS = ["대표자", "소재지", "사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
 
-  // 빈 줄 정리: 줄 단위로 처리
-  const sectionKeywords = ["대표자", "소재지", "사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
-  const lines = result.split("\n").filter((line) => line.trim() !== "");
-  const cleaned = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trimStart();
-    const isSection = sectionKeywords.some((kw) => {
-      const idx = trimmed.indexOf(kw);
-      // 섹션 제목은 줄 시작 5자 이내에 키워드가 있어야 함 (● 대표자, 대표자 등)
-      return idx >= 0 && idx <= 4 && trimmed.length - kw.length <= 15;
+    // 1. 🏢 앞 텍스트 제거
+    const startIdx = text.indexOf("🏢");
+    if (startIdx > 0) text = text.substring(startIdx);
+
+    // 2. 홈페이지 URL 뒤 텍스트 제거
+    const rawLines = text.split("\n");
+    let cutAt = -1;
+    let homepageFound = false;
+    for (let i = 0; i < rawLines.length; i++) {
+      if (rawLines[i].includes("홈페이지")) homepageFound = true;
+      if (homepageFound && rawLines[i].match(/https?:\/\/|www\.|\.com|\.co\.kr|\.kr|\.net|\.org/)) {
+        cutAt = i;
+        break;
+      }
+    }
+    if (cutAt > 0) text = rawLines.slice(0, cutAt + 1).join("\n");
+
+    // 3. 쓸모없는 줄 제거 (빈 줄, 단독 기호, 주석)
+    let lines = text.split("\n").filter((l) => {
+      const t = l.trim();
+      if (t === "" || t === "/" || t === "." || t === "·" || t === "-") return false;
+      if (t.startsWith("※") || t.startsWith(">") || t.startsWith("참고") || t.startsWith("주:")) return false;
+      if (t.includes("권장드립니다") || t.includes("확인하시") || t.includes("참고하세요")) return false;
+      if (t.includes("DART 전자공시") || t.includes("KIND에서") || t.includes("직접 확인")) return false;
+      return true;
     });
-    const isFirstLine = line.startsWith("🏢");
-    if (isSection && cleaned.length > 0) {
-      cleaned.push("");  // 섹션 앞에만 빈 줄 1개
-      cleaned.push(line);
-    } else if (isFirstLine) {
-      cleaned.push(line);
-    } else if (!isSection && !isFirstLine) {
-      // 모든 내용줄을 3칸 들여쓰기로 통일
-      cleaned.push("   " + line.trimStart());
+
+    // 4. 섹션 판별 함수
+    function isSectionTitle(line) {
+      const t = line.trimStart();
+      return SECTIONS.some((kw) => {
+        const idx = t.indexOf(kw);
+        return idx >= 0 && idx <= 4 && t.length <= kw.length + 20;
+      });
     }
+
+    // 5. 구조화: 섹션 제목 앞 빈 줄 + 내용 들여쓰기
+    const structured = [];
+    for (const line of lines) {
+      const isFirst = line.startsWith("🏢");
+      const isSection = isSectionTitle(line);
+
+      if (isFirst) {
+        structured.push(line);
+      } else if (isSection) {
+        if (structured.length > 0) structured.push(""); // 섹션 앞 빈 줄
+        // 이모지를 ●로 교체
+        const trimmed = line.trimStart();
+        const matchedSection = SECTIONS.find((s) => trimmed.includes(s));
+        if (matchedSection) {
+          const titleIdx = trimmed.indexOf(matchedSection);
+          structured.push("● " + trimmed.substring(titleIdx));
+        } else {
+          structured.push(line);
+        }
+      } else {
+        // 내용줄: 3칸 들여쓰기
+        structured.push("   " + line.trimStart());
+      }
+    }
+
+    let output = structured.join("\n");
+
+    // 6. 서술형 어미 제거
+    output = output.replace(/하고 있습니다/g, "");
+    output = output.replace(/입니다\./g, "");
+    output = output.replace(/있습니다\./g, "");
+
+    // 7. "적자", "손실 지속" → 숫자 유지 (이미 프롬프트에서 처리)
+
+    // 8. 최종 검증 로그
+    const hasBuilding = output.startsWith("🏢");
+    const hasURL = output.match(/https?:\/\/|www\.|\.com|\.co\.kr/);
+    const sections = SECTIONS.filter((s) => output.includes("● " + s));
+    console.log(`[검증] 🏢시작:${hasBuilding} URL끝:${!!hasURL} 섹션:${sections.join(",")}`);
+
+    return output;
   }
-  result = cleaned.join("\n");
-
-  // 섹션 제목줄의 이모지를 ●로 강제 교체
-  const sectionTitles = ["대표자", "소재지", "사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
-  result = result.split("\n").map((line) => {
-    if (line.startsWith("🏢")) return line;
-    const trimmed = line.trimStart();
-    const matchedTitle = sectionTitles.find((t) => trimmed.includes(t));
-    if (matchedTitle) {
-      // 제목 앞의 모든 문자(이모지 등) 제거 후 ● 붙이기
-      const titleIdx = trimmed.indexOf(matchedTitle);
-      return "● " + trimmed.substring(titleIdx);
-    }
-    return line;
-  }).join("\n");
-
-  // 단독 / 또는 . 줄 제거
-  result = result.split("\n").filter((l) => l.trim() !== "/" && l.trim() !== "." && l.trim() !== "·").join("\n");
 
   // Append DART data if available
   if (dartData) {
