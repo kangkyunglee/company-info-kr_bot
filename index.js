@@ -1,16 +1,17 @@
-require("dotenv").config();
+try { require("dotenv").config(); } catch {}
 const { Telegraf } = require("telegraf");
 const Anthropic = require("@anthropic-ai/sdk").default;
 const https = require("https");
 
-// Debug: check env vars
-console.log("TELEGRAM_BOT_TOKEN set:", !!process.env.TELEGRAM_BOT_TOKEN);
-console.log("ANTHROPIC_API_KEY set:", !!process.env.ANTHROPIC_API_KEY);
-console.log("DART_API_KEY set:", !!process.env.DART_API_KEY);
+// Debug: log all env var keys
+console.log("All env keys:", Object.keys(process.env).filter(k => k.includes("TELEGRAM") || k.includes("ANTHROPIC") || k.includes("DART")));
+console.log("TELEGRAM_BOT_TOKEN value length:", (process.env.TELEGRAM_BOT_TOKEN || "").length);
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
-  console.error("ERROR: TELEGRAM_BOT_TOKEN is not set!");
-  process.exit(1);
+  console.error("ERROR: TELEGRAM_BOT_TOKEN is not set! Waiting 10s and retrying...");
+  setTimeout(() => {
+    console.log("Retry - TELEGRAM_BOT_TOKEN:", !!process.env.TELEGRAM_BOT_TOKEN);
+  }, 10000);
 }
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
