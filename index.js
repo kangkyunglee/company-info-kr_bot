@@ -228,8 +228,19 @@ async function lookupCompany(companyName) {
   }
   result = cleaned.join("\n");
 
-  // 🏢 외 모든 이모지를 ●로 강제 교체
-  result = result.replace(/^(?!🏢)(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/gmu, "● ");
+  // 섹션 제목줄의 이모지를 ●로 강제 교체
+  const sectionTitles = ["대표자", "소재지", "사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
+  result = result.split("\n").map((line) => {
+    if (line.startsWith("🏢")) return line;
+    const trimmed = line.trimStart();
+    const matchedTitle = sectionTitles.find((t) => trimmed.includes(t));
+    if (matchedTitle) {
+      // 제목 앞의 모든 문자(이모지 등) 제거 후 ● 붙이기
+      const titleIdx = trimmed.indexOf(matchedTitle);
+      return "● " + trimmed.substring(titleIdx);
+    }
+    return line;
+  }).join("\n");
 
   // 단독 / 또는 . 줄 제거
   result = result.split("\n").filter((l) => l.trim() !== "/" && l.trim() !== "." && l.trim() !== "·").join("\n");
