@@ -219,7 +219,12 @@ async function lookupCompany(companyName) {
   const cleaned = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isSection = sectionKeywords.some((kw) => line.includes(kw));
+    const trimmed = line.trimStart();
+    const isSection = sectionKeywords.some((kw) => {
+      const idx = trimmed.indexOf(kw);
+      // 섹션 제목은 줄 시작 5자 이내에 키워드가 있어야 함 (● 대표자, 대표자 등)
+      return idx >= 0 && idx <= 4 && trimmed.length - kw.length <= 15;
+    });
     const isFirstLine = line.startsWith("🏢");
     if (isSection && cleaned.length > 0) {
       cleaned.push("");  // 섹션 앞에만 빈 줄 1개
