@@ -273,7 +273,7 @@ bot.start((ctx) => {
       "• 주요고객사\n" +
       "• 최근 매출액/영업이익 (DART 공시 포함)\n\n" +
       "예시: `삼성전자`, `티엠씨`, `네이버`",
-    { parse_mode: "Markdown", link_preview: { is_disabled: true } }
+    { parse_mode: "Markdown", disable_web_page_preview: true }
   );
 });
 
@@ -285,7 +285,7 @@ bot.help((ctx) => {
       "• `삼성전자`\n" +
       "• `현대자동차`\n" +
       "• `카카오`",
-    { parse_mode: "Markdown", link_preview: { is_disabled: true } }
+    { parse_mode: "Markdown", disable_web_page_preview: true }
   );
 });
 
@@ -311,7 +311,7 @@ bot.on("text", async (ctx) => {
 
     // Try Markdown first, fall back to plain text
     try {
-      await ctx.reply(result, { parse_mode: "Markdown", link_preview: { is_disabled: true } });
+      await ctx.reply(result, { parse_mode: "Markdown", disable_web_page_preview: true });
     } catch {
       await ctx.reply(result);
     }
