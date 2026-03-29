@@ -301,22 +301,10 @@ bot.on("text", async (ctx) => {
     const result = await lookupCompany(companyName);
 
     // Try Markdown first, fall back to plain text
-    const buttons = {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "📊 지분구조", callback_data: `share:${companyName}` },
-            { text: "💹 재무상세", callback_data: `finance:${companyName}` },
-            { text: "⚔️ 경쟁사", callback_data: `competitor:${companyName}` },
-          ],
-        ],
-      },
-      link_preview: { is_disabled: true },
-    };
     try {
-      await ctx.reply(result, { parse_mode: "Markdown", ...buttons });
+      await ctx.reply(result, { parse_mode: "Markdown", link_preview: { is_disabled: true } });
     } catch {
-      await ctx.reply(result, buttons);
+      await ctx.reply(result);
     }
   } catch (error) {
     console.error("Error:", error.message, error.status, JSON.stringify(error.error || {}));
@@ -330,100 +318,6 @@ bot.on("text", async (ctx) => {
     await ctx.deleteMessage(statusMsg.message_id);
   } catch {
     // ignore if can't delete
-  }
-});
-
-// 버튼 클릭 핸들러
-const DETAIL_PROMPTS = {
-  share: (name) => `"${name}" 지분구조. 아래 형식만 출력. 서론/사족 금지.
-
-● 지분구조 - ${name}
-   최대주주: 이름 (X%)
-   2대주주: 이름 (X%)
-   기타: 외국인 X%, 기관 X% 등
-
-개조식. 핵심만. 1줄씩.`,
-
-  finance: (name) => `"${name}" 최근 3개년 재무실적. 아래 형식만 출력. 서론/사족 금지.
-
-● 재무상세 - ${name}
-   2022년 매출 X억 / 영업이익 X억
-   2023년 매출 X억 / 영업이익 X억
-   2024년 매출 X억 / 영업이익 X억
-
-개조식. 핵심만. 연간만.`,
-
-  competitor: (name) => `"${name}" 주요 경쟁사 3개. 아래 형식만 출력. 서론/사족 금지.
-
-● 경쟁사 - ${name}
-   경쟁사1 - 한줄 설명
-   경쟁사2 - 한줄 설명
-   경쟁사3 - 한줄 설명
-
-개조식. 핵심만.`,
-};
-
-bot.on("callback_query", async (ctx) => {
-  const data = ctx.callbackQuery.data;
-  const [type, ...nameParts] = data.split(":");
-  const companyName = nameParts.join(":");
-
-  await ctx.answerCbQuery("조회 중...");
-
-  try {
-    const prompt = DETAIL_PROMPTS[type](companyName);
-    let response;
-    try {
-      response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2048,
-        tools: [
-          {
-            type: "web_search_20250305",
-            name: "web_search",
-            max_uses: 3,
-            user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" },
-          },
-        ],
-        messages: [{ role: "user", content: prompt }],
-      });
-    } catch {
-      response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2048,
-        messages: [{ role: "user", content: prompt }],
-      });
-    }
-
-    const textBlocks = response.content.filter((b) => b.type === "text");
-    let result = textBlocks.map((b) => b.text).join("\n");
-
-    // ● 시작 전 텍스트 제거
-    const startIdx = result.indexOf("●");
-    if (startIdx > 0) result = result.substring(startIdx);
-
-    // 빈 줄 제거 및 들여쓰기 정리
-    const lines = result.split("\n").filter((l) => l.trim() !== "" && l.trim() !== "/" && l.trim() !== ".");
-    const cleaned = [];
-    for (const line of lines) {
-      if (line.startsWith("●")) {
-        cleaned.push(line);
-      } else if (!line.startsWith("   ")) {
-        cleaned.push("   " + line.trimStart());
-      } else {
-        cleaned.push(line);
-      }
-    }
-    result = cleaned.join("\n");
-
-    try {
-      await ctx.reply(result, { parse_mode: "Markdown", link_preview: { is_disabled: true } });
-    } catch {
-      await ctx.reply(result);
-    }
-  } catch (error) {
-    console.error("Detail error:", error.message);
-    await ctx.reply("⚠️ 상세 조회 중 오류가 발생했습니다.");
   }
 });
 
