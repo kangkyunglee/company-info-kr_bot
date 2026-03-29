@@ -160,7 +160,9 @@ const SYSTEM_PROMPT = `기업정보를 아래 형식 그대로 출력. 서론·�
 - 실적: "매출 X억 / 영업이익 X억"만. 적자면 -X억. 괄호 설명 금지
 - 매출 미확인 시 "매출 미공개 / 누적투자 X억"
 - 🏢로 시작, URL로 끝. 앞뒤 텍스트 금지
-- 대표자·소재지 반드시 포함`;
+- 대표자·소재지 반드시 포함
+- 실적·대표자·소재지는 DART 전자공시(opendart.fss.or.kr) 또는 사업보고서 기준 최신 데이터 우선 사용
+- 웹 검색 시 "DART 기업명 사업보고서"로 검색하여 공시 데이터 확인`;
 
 async function lookupCompany(companyName) {
   // Claude 웹 검색과 DART API 동시 호출
