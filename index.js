@@ -231,8 +231,8 @@ async function lookupCompany(companyName) {
   // 🏢 외 모든 이모지를 ●로 강제 교체
   result = result.replace(/^(?!🏢)(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*/gmu, "● ");
 
-  // 단독 / 줄 제거
-  result = result.split("\n").filter((l) => l.trim() !== "/").join("\n");
+  // 단독 / 또는 . 줄 제거
+  result = result.split("\n").filter((l) => l.trim() !== "/" && l.trim() !== "." && l.trim() !== "·").join("\n");
 
   // Append DART data if available
   if (dartData) {
