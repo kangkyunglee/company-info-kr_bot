@@ -186,6 +186,24 @@ async function lookupCompany(companyName) {
   );
   let result = textBlocks.map((block) => block.text).join("\n");
 
+  // 🏢 앞의 모든 텍스트 제거 (서론/인사말 제거)
+  const startIdx = result.indexOf("🏢");
+  if (startIdx > 0) {
+    result = result.substring(startIdx);
+  }
+
+  // 홈페이지 URL 뒤의 모든 텍스트 제거
+  const lines_raw = result.split("\n");
+  let lastUrlIdx = -1;
+  for (let i = 0; i < lines_raw.length; i++) {
+    if (lines_raw[i].match(/https?:\/\//) || lines_raw[i].match(/\w+\.\w+\.\w+/)) {
+      lastUrlIdx = i;
+    }
+  }
+  if (lastUrlIdx > 0 && lastUrlIdx < lines_raw.length - 1) {
+    result = lines_raw.slice(0, lastUrlIdx + 1).join("\n");
+  }
+
   // 빈 줄 정리: 줄 단위로 처리
   const sectionKeywords = ["사업내용", "주요제품", "주요고객사", "실적", "이슈", "홈페이지"];
   const lines = result.split("\n").filter((line) => line.trim() !== "");
