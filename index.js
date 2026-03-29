@@ -11,26 +11,31 @@ const DART_API_KEY = process.env.DART_API_KEY || config.dartKey;
 // DART API
 const AdmZip = require("adm-zip");
 
-function dartJsonRequest(url) {
+function dartRequest(url, binary = false) {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try { resolve(JSON.parse(data)); }
-        catch { reject(new Error("DART JSON parse error")); }
-      });
-    }).on("error", reject);
-  });
-}
-
-function dartBinaryRequest(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
+    const parsed = new URL(url);
+    const options = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": binary ? "application/octet-stream" : "application/json",
+      },
+    };
+    https.request(options, (res) => {
+      if (res.statusCode === 302) {
+        return reject(new Error("DART redirect: " + res.headers.location));
+      }
       const chunks = [];
       res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-    }).on("error", reject);
+      res.on("end", () => {
+        const buf = Buffer.concat(chunks);
+        if (binary) return resolve(buf);
+        try { resolve(JSON.parse(buf.toString())); }
+        catch { reject(new Error("DART JSON parse error")); }
+      });
+    }).on("error", reject).end();
   });
 }
 
@@ -43,26 +48,30 @@ async function getCorpCode(companyName) {
     // 캐시 24시간 유지
     if (!corpCodeCache || Date.now() - corpCodeTime > 86400000) {
       console.log("DART 기업코드 목록 다운로드 중...");
-      const zipBuffer = await dartBinaryRequest(
-        `https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=${DART_API_KEY}`
+      const zipBuffer = await dartRequest(
+        `https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=${DART_API_KEY}`, true
       );
       const zip = new AdmZip(zipBuffer);
       const xml = zip.readAsText(zip.getEntries()[0]);
       // XML 파싱: <corp_code>코드</corp_code><corp_name>이름</corp_name> 추출
       const corps = [];
-      const regex = /<corp_code>(\d+)<\/corp_code>\s*<corp_name>([^<]+)<\/corp_name>/g;
+      const regex = /<corp_code>(\d+)<\/corp_code>\s*<corp_name>([^<]+)<\/corp_name>\s*<stock_code>([^<]*)<\/stock_code>/g;
       let match;
       while ((match = regex.exec(xml)) !== null) {
-        corps.push({ code: match[1], name: match[2] });
+        corps.push({ code: match[1], name: match[2], stock: match[3].trim() });
       }
       corpCodeCache = corps;
       corpCodeTime = Date.now();
       console.log(`DART 기업코드 ${corps.length}개 로드 완료`);
     }
 
-    // 정확 매칭 → 부분 매칭 순서로 검색
+    // 상장 기업 우선 매칭: 정확 매칭(상장) → 정확 매칭(비상장) → 부분 매칭(상장)
+    const exactListed = corpCodeCache.find((c) => c.name === companyName && c.stock);
+    if (exactListed) return exactListed.code;
     const exact = corpCodeCache.find((c) => c.name === companyName);
     if (exact) return exact.code;
+    const partialListed = corpCodeCache.find((c) => c.name.includes(companyName) && c.stock);
+    if (partialListed) return partialListed.code;
     const partial = corpCodeCache.find((c) => c.name.includes(companyName));
     if (partial) return partial.code;
     return null;
@@ -79,7 +88,7 @@ async function getDartFinancials(companyName) {
     if (!corpCode) return null;
 
     // 2. 기업 상세정보 (대표자, 주소)
-    const companyInfo = await dartJsonRequest(
+    const companyInfo = await dartRequest(
       `https://opendart.fss.or.kr/api/company.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}`
     );
     const dartCeo = companyInfo.status === "000" ? companyInfo.ceo_nm : null;
@@ -88,8 +97,8 @@ async function getDartFinancials(companyName) {
     // 3. 최근 연도 재무제표 (연결 + 개별)
     const year = new Date().getFullYear() - 1;
     const [cfsResult, ofsResult] = await Promise.all([
-      dartJsonRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=CFS`),
-      dartJsonRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=OFS`),
+      dartRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=CFS`),
+      dartRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=OFS`),
     ]);
 
     const hasCfs = cfsResult.status === "000" && cfsResult.list;
