@@ -194,14 +194,19 @@ async function lookupCompany(companyName) {
 
   // 홈페이지 URL 뒤의 모든 텍스트 제거
   const lines_raw = result.split("\n");
-  let lastUrlIdx = -1;
+  let cutIdx = -1;
+  let foundHomepage = false;
   for (let i = 0; i < lines_raw.length; i++) {
-    if (lines_raw[i].match(/https?:\/\//) || lines_raw[i].match(/\w+\.\w+\.\w+/)) {
-      lastUrlIdx = i;
+    if (lines_raw[i].includes("홈페이지")) {
+      foundHomepage = true;
+    }
+    if (foundHomepage && (lines_raw[i].match(/https?:\/\//) || lines_raw[i].match(/www\./) || lines_raw[i].match(/\.\w{2,3}$/))) {
+      cutIdx = i;
+      break;
     }
   }
-  if (lastUrlIdx > 0 && lastUrlIdx < lines_raw.length - 1) {
-    result = lines_raw.slice(0, lastUrlIdx + 1).join("\n");
+  if (cutIdx > 0) {
+    result = lines_raw.slice(0, cutIdx + 1).join("\n");
   }
 
   // 빈 줄 정리: 줄 단위로 처리
