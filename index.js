@@ -131,7 +131,7 @@ const SYSTEM_PROMPT = `기업정보를 출력해. 반드시 아래 형식을 그
 - 첫 글자는 🏢로 시작. 앞에 어떤 텍스트도 금지
 - 마지막은 URL로 끝. 뒤에 어떤 텍스트도 금지
 - 연간 실적만(분기X)
-- 확인 불가 항목은 생략
+- 확인 불가 항목은 생략. 단 대표자·소재지는 반드시 포함
 - DART 공시 데이터 제공 시 우선 사용`;
 
 async function lookupCompany(companyName) {
