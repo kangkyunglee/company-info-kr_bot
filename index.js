@@ -336,54 +336,25 @@ async function searchNews(companyName) {
   return result;
 }
 
-// 사용자 모드 저장
-const userMode = {};
-
 // /start command
 bot.start((ctx) => {
   ctx.reply(
-    "🏢 *기업정보 봇*\n\n" +
-      "/기업조사 - 기업 정보 조회\n" +
-      "/기사검색 - 최신 기사 검색",
-    { parse_mode: "Markdown", disable_web_page_preview: true }
+    "기업명을 입력하면 정보를 조회합니다.\n예시: 삼성전자, 티엠씨, 네이버",
+    { disable_web_page_preview: true }
   );
 });
 
 // /help command
 bot.help((ctx) => {
-  ctx.reply(
-    "/기업조사 - 기업 정보 조회\n" +
-      "/기사검색 - 최신 기사 검색",
-    { parse_mode: "Markdown", disable_web_page_preview: true }
-  );
-});
-
-// /기업조사 command
-bot.hears(/^\/기업조사/, (ctx) => {
-  userMode[ctx.from.id] = "company";
-  ctx.reply("어떤 기업을 확인하시겠습니까?");
-});
-
-// /기사검색 command
-bot.hears(/^\/기사검색/, (ctx) => {
-  userMode[ctx.from.id] = "news";
-  ctx.reply("어떤 기업의 기사를 검색하시겠습니까?");
+  ctx.reply("기업명을 입력하면 정보를 조회합니다.");
 });
 
 // Handle text messages
 bot.on("text", async (ctx) => {
   const companyName = ctx.message.text.trim();
 
-  // Ignore commands
   if (companyName.startsWith("/")) return;
 
-  // 모드 미선택 시 안내
-  const mode = userMode[ctx.from.id];
-  if (!mode) {
-    return ctx.reply("/기업조사 또는 /기사검색 을 먼저 선택해주세요.");
-  }
-
-  // Ignore very short or very long inputs
   if (companyName.length < 2) {
     return ctx.reply("2글자 이상의 기업명을 입력해주세요.");
   }
@@ -391,15 +362,10 @@ bot.on("text", async (ctx) => {
     return ctx.reply("기업명이 너무 깁니다. 간단한 기업명을 입력해주세요.");
   }
 
-  const statusMsg = await ctx.reply(`🔍 "${companyName}" ${mode === "company" ? "조회" : "기사 검색"} 중...`);
+  const statusMsg = await ctx.reply(`🔍 "${companyName}" 조회 중...`);
 
   try {
-    let result;
-    if (mode === "company") {
-      result = await lookupCompany(companyName);
-    } else {
-      result = await searchNews(companyName);
-    }
+    const result = await lookupCompany(companyName);
 
     try {
       await ctx.reply(result, { parse_mode: "Markdown", disable_web_page_preview: true });
@@ -413,15 +379,9 @@ bot.on("text", async (ctx) => {
     );
   }
 
-  // Delete "조회 중" message
   try {
     await ctx.deleteMessage(statusMsg.message_id);
-  } catch {
-    // ignore if can't delete
-  }
-
-  // 모드 초기화
-  delete userMode[ctx.from.id];
+  } catch {}
 });
 
 // Error handling
