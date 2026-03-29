@@ -3,6 +3,16 @@ const { Telegraf } = require("telegraf");
 const Anthropic = require("@anthropic-ai/sdk").default;
 const https = require("https");
 
+// Debug: check env vars
+console.log("TELEGRAM_BOT_TOKEN set:", !!process.env.TELEGRAM_BOT_TOKEN);
+console.log("ANTHROPIC_API_KEY set:", !!process.env.ANTHROPIC_API_KEY);
+console.log("DART_API_KEY set:", !!process.env.DART_API_KEY);
+
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  console.error("ERROR: TELEGRAM_BOT_TOKEN is not set!");
+  process.exit(1);
+}
+
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const DART_API_KEY = process.env.DART_API_KEY;
