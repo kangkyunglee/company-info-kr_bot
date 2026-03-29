@@ -38,6 +38,8 @@ async function getDartFinancials(companyName) {
     }
 
     const corpCode = searchResult.corp_code;
+    const dartCeo = searchResult.ceo_nm || null;
+    const dartAddr = searchResult.adres || null;
     const year = new Date().getFullYear() - 1;
 
     // 2. 연결(CFS) + 개별(OFS) 동시 조회
@@ -52,6 +54,8 @@ async function getDartFinancials(companyName) {
     if (!hasCfs && !hasOfs) return null;
 
     let result = `\n📊 DART 공시 데이터 (${year}년 사업보고서)\n`;
+    if (dartCeo) result += `대표자: ${dartCeo}\n`;
+    if (dartAddr) result += `소재지: ${dartAddr}\n`;
     if (hasCfs) result += formatDartSection(cfsResult.list, "연결");
     if (hasOfs) result += formatDartSection(ofsResult.list, "개별");
 
@@ -277,9 +281,19 @@ async function lookupCompany(companyName) {
     return output;
   }
 
-  // Append DART data if available
+  // DART 데이터로 대표자/소재지 교체 및 재무데이터 추가
   if (dartData) {
-    result += "\n---\n" + dartData;
+    const dartLines = dartData.split("\n");
+    for (const dl of dartLines) {
+      if (dl.startsWith("대표자: ")) {
+        const dartCeo = dl.replace("대표자: ", "");
+        result = result.replace(/(● 대표자\n)(   .+)/m, `$1   ${dartCeo}`);
+      }
+      if (dl.startsWith("소재지: ")) {
+        const dartAddr = dl.replace("소재지: ", "");
+        result = result.replace(/(● 소재지\n)(   .+)/m, `$1   ${dartAddr}`);
+      }
+    }
   }
 
   return result;
