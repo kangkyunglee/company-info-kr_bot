@@ -53,12 +53,16 @@ async function getCorpCode(companyName, stockCode = null) {
       );
       const zip = new AdmZip(zipBuffer);
       const xml = zip.readAsText(zip.getEntries()[0]);
-      // XML 파싱: <corp_code>코드</corp_code><corp_name>이름</corp_name> 추출
+      // XML 파싱
       const corps = [];
-      const regex = /<corp_code>(\d+)<\/corp_code>\s*<corp_name>([^<]+)<\/corp_name>\s*<stock_code>([^<]*)<\/stock_code>/g;
+      const regex = /<corp_code>(\d+)<\/corp_code>[\s\S]*?<corp_name>([^<]+)<\/corp_name>[\s\S]*?<stock_code>([^<]*)<\/stock_code>/g;
       let match;
       while ((match = regex.exec(xml)) !== null) {
-        corps.push({ code: match[1], name: match[2], stock: match[3].trim() });
+        corps.push({ code: match[1], name: match[2].trim(), stock: match[3].trim() });
+      }
+      // 파싱 실패 시 디버그 로그
+      if (corps.length === 0) {
+        console.log("XML 첫 500자:", xml.substring(0, 500));
       }
       corpCodeCache = corps;
       corpCodeTime = Date.now();
