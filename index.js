@@ -43,7 +43,7 @@ function dartRequest(url, binary = false) {
 let corpCodeCache = null;
 let corpCodeTime = 0;
 
-async function getCorpCode(companyName) {
+async function getCorpCode(companyName, stockCode = null) {
   try {
     // 캐시 24시간 유지
     if (!corpCodeCache || Date.now() - corpCodeTime > 86400000) {
@@ -65,15 +65,16 @@ async function getCorpCode(companyName) {
       console.log(`DART 기업코드 ${corps.length}개 로드 완료`);
     }
 
-    // 상장 기업 우선 매칭: 정확 매칭(상장) → 정확 매칭(비상장) → 부분 매칭(상장)
+    // 종목코드로 정확 매칭 (stockCode가 제공된 경우)
+    if (stockCode) {
+      const byStock = corpCodeCache.find((c) => c.stock === stockCode);
+      if (byStock) return byStock.code;
+    }
+    // 이름으로 매칭: 상장 우선
     const exactListed = corpCodeCache.find((c) => c.name === companyName && c.stock);
     if (exactListed) return exactListed.code;
     const exact = corpCodeCache.find((c) => c.name === companyName);
     if (exact) return exact.code;
-    const partialListed = corpCodeCache.find((c) => c.name.includes(companyName) && c.stock);
-    if (partialListed) return partialListed.code;
-    const partial = corpCodeCache.find((c) => c.name.includes(companyName));
-    if (partial) return partial.code;
     return null;
   } catch (error) {
     console.error("기업코드 검색 오류:", error.message);
@@ -81,10 +82,10 @@ async function getCorpCode(companyName) {
   }
 }
 
-async function getDartFinancials(companyName) {
+async function getDartFinancials(companyName, stockCode = null) {
   try {
-    // 1. 기업코드 검색
-    const corpCode = await getCorpCode(companyName);
+    // 1. 기업코드 검색 (종목코드 우선)
+    const corpCode = await getCorpCode(companyName, stockCode);
     if (!corpCode) return null;
 
     // 2. 기업 상세정보 (대표자, 주소)
@@ -174,10 +175,6 @@ const SYSTEM_PROMPT = `기업정보를 아래 형식 그대로 출력. 서론·�
 - 웹 검색 시 "DART 기업명 사업보고서"로 검색하여 공시 데이터 확인`;
 
 async function lookupCompany(companyName) {
-  // Claude 웹 검색과 DART API 동시 호출
-  // Claude 웹 검색과 DART를 병렬 호출 (속도 개선)
-  const dartPromise = getDartFinancials(companyName);
-
   let claudeResponse;
   try {
     claudeResponse = await anthropic.messages.create({
@@ -218,7 +215,12 @@ async function lookupCompany(companyName) {
     });
   }
 
-  const dartData = await dartPromise;
+  // Claude 응답에서 종목코드 추출 후 DART 호출
+  const textForCode = claudeResponse.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+  const stockMatch = textForCode.match(/\((\d{6})/);
+  const stockCode = stockMatch ? stockMatch[1] : null;
+  console.log(`[DART] 종목코드 추출: ${stockCode}`);
+  const dartData = await getDartFinancials(companyName, stockCode);
 
   // Extract text from Claude response
   const textBlocks = claudeResponse.content.filter(
