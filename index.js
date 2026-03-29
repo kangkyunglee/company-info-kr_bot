@@ -125,7 +125,8 @@ const SYSTEM_PROMPT = `당신은 기업정보 조회 전문가입니다. 사용�
 - 정보를 찾기 어려운 항목은 "확인 불가"로 표시
 - 최근 주요이슈는 최신 기사나 공시 기반으로 1~3개 작성. 없으면 생략
 - 텔레그램 기본 Markdown 형식 (MarkdownV2 아님)
-- DART 공시 데이터가 함께 제공되면 그 수치를 우선 사용하고 "(DART 공시)"로 표시`;
+- DART 공시 데이터가 함께 제공되면 그 수치를 우선 사용하고 "(DART 공시)"로 표시
+- 섹션 사이에 빈 줄을 1줄만 넣고, 불필요한 빈 줄 넣지 않기. 전체적으로 컴팩트하게 작성`;
 
 async function lookupCompany(companyName) {
   // Claude 웹 검색과 DART API 동시 호출
