@@ -140,9 +140,11 @@ const SYSTEM_PROMPT = `기업정보를 출력해. 반드시 아래 형식을 그
 
 async function lookupCompany(companyName) {
   // Claude 웹 검색과 DART API 동시 호출
+  // Claude 웹 검색과 DART를 병렬 호출 (속도 개선)
+  const dartPromise = getDartFinancials(companyName);
+
   let claudeResponse;
   try {
-    // 먼저 웹 검색 포함으로 시도
     claudeResponse = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 2048,
@@ -168,7 +170,6 @@ async function lookupCompany(companyName) {
     });
   } catch (err) {
     console.error("Web search API error:", err.message);
-    // 웹 검색 실패 시 일반 모드로 재시도
     claudeResponse = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 2048,
@@ -182,7 +183,7 @@ async function lookupCompany(companyName) {
     });
   }
 
-  const dartData = await getDartFinancials(companyName);
+  const dartData = await dartPromise;
 
   // Extract text from Claude response
   const textBlocks = claudeResponse.content.filter(
