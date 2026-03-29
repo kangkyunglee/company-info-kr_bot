@@ -197,7 +197,7 @@ async function lookupCompany(companyName) {
     // 3. 쓸모없는 줄 제거 (빈 줄, 단독 기호, 주석)
     let lines = text.split("\n").filter((l) => {
       const t = l.trim();
-      if (t === "" || t === "/" || t === "." || t === "·" || t === "-" || t === ",") return false;
+      if (t === "" || t === "/" || t === "." || t === "·" || t === "-" || t === "," || t === ";" || t.length <= 2) return false;
       if (t.startsWith("※") || t.startsWith(">") || t.startsWith("참고") || t.startsWith("주:")) return false;
       if (t.includes("권장드립니다") || t.includes("확인하시") || t.includes("참고하세요")) return false;
       if (t.includes("DART 전자공시") || t.includes("KIND에서") || t.includes("직접 확인")) return false;
