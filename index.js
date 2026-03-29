@@ -100,8 +100,10 @@ const SYSTEM_PROMPT = `당신은 기업정보 조회 전문가입니다. 사용�
 
 async function lookupCompany(companyName) {
   // Claude 웹 검색과 DART API 동시 호출
-  const [claudeResponse, dartData] = await Promise.all([
-    anthropic.messages.create({
+  let claudeResponse;
+  try {
+    // 먼저 웹 검색 포함으로 시도
+    claudeResponse = await anthropic.messages.create({
       model: "claude-sonnet-4-6-20250514",
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
@@ -123,9 +125,24 @@ async function lookupCompany(companyName) {
           content: `"${companyName}" 기업의 사업내용, 주요제품, 주요고객사, 최근 매출액/영업이익을 조회해주세요.`,
         },
       ],
-    }),
-    getDartFinancials(companyName),
-  ]);
+    });
+  } catch (err) {
+    console.error("Web search API error:", err.message);
+    // 웹 검색 실패 시 일반 모드로 재시도
+    claudeResponse = await anthropic.messages.create({
+      model: "claude-sonnet-4-6-20250514",
+      max_tokens: 2048,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `"${companyName}" 기업에 대해 알고 있는 정보를 바탕으로 사업내용, 주요제품, 주요고객사, 최근 매출액/영업이익을 정리해주세요.`,
+        },
+      ],
+    });
+  }
+
+  const dartData = await getDartFinancials(companyName);
 
   // Extract text from Claude response
   const textBlocks = claudeResponse.content.filter(
@@ -194,7 +211,7 @@ bot.on("text", async (ctx) => {
       await ctx.reply(result);
     }
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Error:", error.message, error.status, JSON.stringify(error.error || {}));
     await ctx.reply(
       "⚠️ 조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
     );
