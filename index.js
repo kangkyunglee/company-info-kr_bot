@@ -8,56 +8,100 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN || config.telegramToken)
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || config.anthropicKey });
 const DART_API_KEY = process.env.DART_API_KEY || config.dartKey;
 
-// DART API: 기업명으로 고유번호 검색
-function dartRequest(url) {
+// DART API
+const AdmZip = require("adm-zip");
+
+function dartJsonRequest(url) {
   return new Promise((resolve, reject) => {
-    https
-      .get(url, (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            reject(new Error("DART JSON parse error"));
-          }
-        });
-      })
-      .on("error", reject);
+    https.get(url, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error("DART JSON parse error")); }
+      });
+    }).on("error", reject);
   });
+}
+
+function dartBinaryRequest(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+    }).on("error", reject);
+  });
+}
+
+// 기업코드 캐시
+let corpCodeCache = null;
+let corpCodeTime = 0;
+
+async function getCorpCode(companyName) {
+  try {
+    // 캐시 24시간 유지
+    if (!corpCodeCache || Date.now() - corpCodeTime > 86400000) {
+      console.log("DART 기업코드 목록 다운로드 중...");
+      const zipBuffer = await dartBinaryRequest(
+        `https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=${DART_API_KEY}`
+      );
+      const zip = new AdmZip(zipBuffer);
+      const xml = zip.readAsText(zip.getEntries()[0]);
+      // XML 파싱: <corp_code>코드</corp_code><corp_name>이름</corp_name> 추출
+      const corps = [];
+      const regex = /<corp_code>(\d+)<\/corp_code>\s*<corp_name>([^<]+)<\/corp_name>/g;
+      let match;
+      while ((match = regex.exec(xml)) !== null) {
+        corps.push({ code: match[1], name: match[2] });
+      }
+      corpCodeCache = corps;
+      corpCodeTime = Date.now();
+      console.log(`DART 기업코드 ${corps.length}개 로드 완료`);
+    }
+
+    // 정확 매칭 → 부분 매칭 순서로 검색
+    const exact = corpCodeCache.find((c) => c.name === companyName);
+    if (exact) return exact.code;
+    const partial = corpCodeCache.find((c) => c.name.includes(companyName));
+    if (partial) return partial.code;
+    return null;
+  } catch (error) {
+    console.error("기업코드 검색 오류:", error.message);
+    return null;
+  }
 }
 
 async function getDartFinancials(companyName) {
   try {
-    // 1. 기업 검색 (고유번호 조회)
-    const searchUrl = `https://opendart.fss.or.kr/api/company.json?crtfc_key=${DART_API_KEY}&corp_name=${encodeURIComponent(companyName)}`;
-    const searchResult = await dartRequest(searchUrl);
+    // 1. 기업코드 검색
+    const corpCode = await getCorpCode(companyName);
+    if (!corpCode) return null;
 
-    if (searchResult.status !== "000" || !searchResult.corp_code) {
-      return null;
-    }
+    // 2. 기업 상세정보 (대표자, 주소)
+    const companyInfo = await dartJsonRequest(
+      `https://opendart.fss.or.kr/api/company.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}`
+    );
+    const dartCeo = companyInfo.status === "000" ? companyInfo.ceo_nm : null;
+    const dartAddr = companyInfo.status === "000" ? companyInfo.adres : null;
 
-    const corpCode = searchResult.corp_code;
-    const dartCeo = searchResult.ceo_nm || null;
-    const dartAddr = searchResult.adres || null;
+    // 3. 최근 연도 재무제표 (연결 + 개별)
     const year = new Date().getFullYear() - 1;
-
-    // 2. 연결(CFS) + 개별(OFS) 동시 조회
     const [cfsResult, ofsResult] = await Promise.all([
-      dartRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=CFS`),
-      dartRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=OFS`),
+      dartJsonRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=CFS`),
+      dartJsonRequest(`https://opendart.fss.or.kr/api/fnlttSinglAcnt.json?crtfc_key=${DART_API_KEY}&corp_code=${corpCode}&bsns_year=${year}&reprt_code=11011&fs_div=OFS`),
     ]);
 
     const hasCfs = cfsResult.status === "000" && cfsResult.list;
     const hasOfs = ofsResult.status === "000" && ofsResult.list;
 
-    if (!hasCfs && !hasOfs) return null;
+    if (!hasCfs && !hasOfs && !dartCeo) return null;
 
-    let result = `\n📊 DART 공시 데이터 (${year}년 사업보고서)\n`;
+    let result = "\n";
     if (dartCeo) result += `대표자: ${dartCeo}\n`;
     if (dartAddr) result += `소재지: ${dartAddr}\n`;
-    if (hasCfs) result += formatDartSection(cfsResult.list, "연결");
-    if (hasOfs) result += formatDartSection(ofsResult.list, "개별");
+    if (hasCfs) result += formatDartSection(cfsResult.list, "연결", year);
+    if (hasOfs) result += formatDartSection(ofsResult.list, "개별", year);
 
     return result;
   } catch (error) {
@@ -66,7 +110,7 @@ async function getDartFinancials(companyName) {
   }
 }
 
-function formatDartSection(list, label) {
+function formatDartSection(list, label, year) {
   const revenue = list.find(
     (item) =>
       item.account_nm === "매출액" || item.account_nm === "수익(매출액)"
