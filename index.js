@@ -1,11 +1,12 @@
-require("dotenv").config();
+try { require("dotenv").config(); } catch {}
 const { Telegraf } = require("telegraf");
 const Anthropic = require("@anthropic-ai/sdk").default;
 const https = require("https");
+const config = require("./config.js");
 
-const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const DART_API_KEY = process.env.DART_API_KEY;
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN || config.telegramToken);
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || config.anthropicKey });
+const DART_API_KEY = process.env.DART_API_KEY || config.dartKey;
 
 // DART API: 기업명으로 고유번호 검색
 function dartRequest(url) {
