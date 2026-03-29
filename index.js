@@ -3,8 +3,9 @@ const { Telegraf } = require("telegraf");
 const Anthropic = require("@anthropic-ai/sdk").default;
 const https = require("https");
 
-// Debug: log all env var keys
-console.log("All env keys:", Object.keys(process.env).filter(k => k.includes("TELEGRAM") || k.includes("ANTHROPIC") || k.includes("DART")));
+// Debug: log ALL env var keys to check Railway injection
+console.log("Total env vars:", Object.keys(process.env).length);
+console.log("All env keys:", Object.keys(process.env).join(", "));
 console.log("TELEGRAM_BOT_TOKEN value length:", (process.env.TELEGRAM_BOT_TOKEN || "").length);
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
